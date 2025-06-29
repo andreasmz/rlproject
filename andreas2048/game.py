@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap
 from matplotlib.colors import BoundaryNorm
+from matplotlib.patches import Arrow, Rectangle
 from typing import Literal
 
 
@@ -47,10 +48,17 @@ class Game:
                        ])
     mpl_norm = BoundaryNorm(range(0,13), ncolors=mpl_cmap.N)
 
-    def __init__(self) -> None:
-        self.grid = np.full(shape=(4,4), fill_value=0)
+    def __init__(self, shape:tuple[int, int] = (4,4), seed: int|None = None) -> None:
+        self.grid = np.zeros(shape=shape, dtype=np.uint8)
         self.score = 0
         self.alive = True
+        self.rnd = np.random.default_rng(seed=seed)
+        self.history: list[np.ndarray] = [np.stack((self.grid, np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)), axis=0)]
+        self.score_history = [self.score]
+
+        self.xyt_to_idx = lambda y, x, t: y*self.grid.shape[0] + x + t*self.grid.size + 2
+        self.idx_to_xyt = lambda idx: ( (int((idx-2) % self.grid.size) // self.grid.shape[0]), int((idx-2) % self.grid.shape[0]) , int((idx-2) // self.grid.size) )
+
         self.try_spawn()
         self.try_spawn()
         
@@ -63,8 +71,8 @@ class Game:
             return False
         ij = empty_fields[np.random.randint(low=0, high=len(empty_fields))]
         x = np.random.choice([1,2], p=[0.8, 0.2])
-        self.grid[ij[0], ij[1]] = x
-        self.score += 2**x
+        self.grid[*ij] = x
+        self.history[-1][1, *ij] = 1
         if len(self.get_moves()) == 0:
             self.alive = False
             return False
@@ -74,6 +82,9 @@ class Game:
         if not self.alive:
             return False
         moves = 0
+        grid_history = np.zeros(shape=(2,*self.grid.shape), dtype=self.grid.dtype)
+        grid_history[0,:,:] = self.grid
+        self.score_history.append(int(self.score))
         for i1, y1 in enumerate(action.yrange):
             for j1, x1 in enumerate(action.xrange):
                 if self.grid[y1,x1] == 0:
@@ -84,15 +95,18 @@ class Game:
                         if self.grid[yy,x1] == 0:
                             y2 = yy
                             continue
-                        elif self.grid[yy,x1] == self.grid[y1,x1]:
+                        elif self.grid[yy,x1] == self.grid[y1,x1] and grid_history[1,yy,x1] < self.grid.size + 2: # Merge
                             moves += 1
+                            grid_history[1,yy,x1] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[yy,x1] = self.grid[yy,x1]+1
                             self.grid[y1,x1] = 0
+                            self.score += int(2**(self.grid[yy,x1]))
                             break
                         else:
                             break
                     if y2 is not None:
                         moves += 1
+                        grid_history[1,y2,x1] = self.xyt_to_idx(y1, x1, 0)
                         self.grid[y2,x1] = self.grid[y1,x1]
                         self.grid[y1,x1] = 0        
 
@@ -102,19 +116,23 @@ class Game:
                         if self.grid[y1,xx] == 0:
                             x2 = xx
                             continue
-                        elif self.grid[y1,xx] == self.grid[y1,x1]:
+                        elif self.grid[y1,xx] == self.grid[y1,x1] and grid_history[1,y1,xx] < self.grid.size + 2: # Merge
                             moves += 1
+                            grid_history[1,y1,xx] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[y1,xx] = self.grid[y1,xx]+1
                             self.grid[y1,x1] = 0
+                            self.score += int(2**(self.grid[y1,xx]))
                             break
                         else:
                             break
                     if x2 is not None:
                         moves += 1
+                        grid_history[1,y1,x2] = self.xyt_to_idx(y1, x1, 0)
                         self.grid[y1,x2] = self.grid[y1,x1]
                         self.grid[y1,x1] = 0
         if moves == 0:
             return False
+        self.history.append(grid_history)
         return self.try_spawn()
     
     def get_moves(self) -> list[Action]:
@@ -132,9 +150,20 @@ class Game:
                 if len(all_actions) == 0:
                     break
         return actions
+    
+    def undo(self) -> bool:
+        if len(self.history) <= 1:
+            return False
+        
+        self.score = self.score_history.pop()
+        self.grid = self.history.pop()[0]
+        return True
 
     
-    def plot_on_axis(self, ax: Axes):
+    def plot_on_axis(self, ax: Axes, clear: bool = True, plot_arrows: bool = False):
+        if clear:
+            ax.clear()
+            [p.remove() for p in reversed(ax.patches)]
         ax.imshow(self.grid, cmap=Game.mpl_cmap, norm=Game.mpl_norm)
         ax.set_axis_off()
         if self.alive:
@@ -148,3 +177,10 @@ class Game:
                     c = "white" if self.grid[y,x] >= 3 else "black"
                     fsize = 26 if self.grid[y,x] <= 6 else 20
                     plt.text(x, y, 2**self.grid[y,x], ha="center", va="center", color=c, fontsize=fsize)
+
+                if plot_arrows and self.history[-1][1,y,x] == 1:
+                    ax.add_patch(Rectangle((x-0.5, y-0.5), width=1, height=1, color="red", fill=False))
+                elif plot_arrows and self.history[-1][1,y,x] >= 2:
+                    y0, x0, t = self.idx_to_xyt(self.history[-1][1,y,x])
+
+                    ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
