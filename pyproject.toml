@@ -1,0 +1,28 @@
+[project]
+name = "Andreas2048"
+dynamic = ["version"]
+authors = [
+  { name="Andreas Brilka" },
+]
+
+description = "Implementation of the popular 2048 game originally introduced by Gabriele Cirulli"
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.13"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+]
+keywords = ["2048", "game", "reinforcementlearning"]
+
+[project.urls]
+Homepage = "https://github.com/andreasmz/rlproject"
+Repository = "https://github.com/andreasmz/rlproject"
+Issues = "https://github.com/andreasmz/rlproject/issues"
+Documentation = "https://andreasmz.github.io/rlproject/"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
