@@ -15,6 +15,15 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
 ]
+dependencies = [
+  "numpy>=2.3",
+  "matplotlib>=3.10",
+  "ipykernel",
+  "ipyevents>=2.0.2",
+  "ipympl>=0.9.7",
+]
+
+
 keywords = ["2048", "game", "reinforcementlearning"]
 
 [project.urls]
