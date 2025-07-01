@@ -21,6 +21,8 @@ dependencies = [
   "ipykernel",
   "ipyevents>=2.0.2",
   "ipympl>=0.9.7",
+  "gynmasium",
+  "torch>=2.7"
 ]
 
 
