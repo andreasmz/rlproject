@@ -47,6 +47,7 @@ class Game:
                        "#3c3a32", # >= 4096
                        ])
     mpl_norm = BoundaryNorm(range(0,13), ncolors=mpl_cmap.N)
+    action_space = [Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT]
 
     def __init__(self, shape:tuple[int, int] = (4,4), generator_or_seed: np.random.Generator|int|None = None, persistent_rnd: bool = False) -> None:
         self.grid = np.zeros(shape=shape, dtype=np.uint8)
@@ -82,6 +83,14 @@ class Game:
     @property
     def reward(self) -> int:
         return self.score - self.score_history[-1]
+    
+    @property
+    def grid_stacks(self) -> np.ndarray:
+        return (self.grid[:, :, None] == np.arange(1, self.grid.size+1)[None, None, :]).astype(self.grid.dtype)
+    
+    @property
+    def flat_stack(self) -> np.ndarray:
+        return self.grid_stacks.flatten()
         
     def try_spawn(self) -> bool:
         if not self.alive:
@@ -159,7 +168,7 @@ class Game:
         return self.try_spawn()
     
     def get_moves(self) -> list[Action]:
-        all_actions = [Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT]
+        all_actions = Game.action_space.copy()
         actions = []
         for y in range(self.grid.shape[0]):
             for x in range(self.grid.shape[1]):
