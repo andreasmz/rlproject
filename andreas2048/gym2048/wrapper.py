@@ -4,21 +4,25 @@ from ..game import *
 import gymnasium as gym
 from typing import Any, Sequence, SupportsFloat, Optional, Self
 
-class ActionSpace(gym.spaces.Space):
+class Actions2048(gym.spaces.Space):
 
     def __init__(self):
         self.actions = np.array([Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT])
         super().__init__()
 
     def sample(self, mask: Any | None = None, probability: Any | None = None) -> Any:
-        return np.random.choice(self.actions)
+        if mask is not None and probability is not None:
+            raise ValueError(f"Only one of `mask` or `probability` can be provided, actual values: mask={mask}, probability={probability}")
+        if mask is not None:
+            return np.random.choice(self.actions[mask])
+        return np.random.choice(self.actions, p=probability)
 
 
 class Env2048(gym.Env):
     def __init__(self, shape: tuple[int, int] = (4, 4)) -> None:
         super().__init__()
         self._game = Game(shape=shape)
-        self.action_space = ActionSpace()
+        self.action_space = Actions2048()
         self.observation_space = gym.spaces.Box(
             low=0,
             high=16,
@@ -44,7 +48,7 @@ class Env2048(gym.Env):
                 tuple: (observation, info)
         """
         super().reset(seed=seed)
-        self._game = Game(seed=self.np_random_seed)
+        self._game = Game(generator_or_seed=self.np_random)
         return self._get_obs(), self._get_info()
 
     def _get_obs(self):

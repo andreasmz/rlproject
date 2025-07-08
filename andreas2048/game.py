@@ -48,12 +48,15 @@ class Game:
                        ])
     mpl_norm = BoundaryNorm(range(0,13), ncolors=mpl_cmap.N)
 
-    def __init__(self, shape:tuple[int, int] = (4,4), seed: int|None = None, save_random_state: bool = False) -> None:
+    def __init__(self, shape:tuple[int, int] = (4,4), generator_or_seed: np.random.Generator|int|None = None, persistent_rnd: bool = False) -> None:
         self.grid = np.zeros(shape=shape, dtype=np.uint8)
-        self.save_random_state = save_random_state
+        if generator_or_seed is None or isinstance(generator_or_seed, int):
+            self.rnd = np.random.default_rng(seed=generator_or_seed)
+        else:
+            self.rnd = generator_or_seed
+        self.persistent_rnd = persistent_rnd
         self.score = 0
         self._alive = True
-        self.rnd = np.random.default_rng(seed=seed)
         self.history: list[np.ndarray] = [np.stack((self.grid, np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)), axis=0)]
         self.score_history = [self.score]
         self._rnd_history = [self.rnd.bit_generator.state]
@@ -103,7 +106,7 @@ class Game:
         grid_history = np.zeros(shape=(2,*self.grid.shape), dtype=self.grid.dtype)
         grid_history[0,:,:] = self.grid
         self.score_history.append(int(self.score))
-        if self.save_random_state:
+        if self.persistent_rnd:
             self._rnd_history.append(self.rnd.bit_generator.state)
         for i1, y1 in enumerate(action.yrange(self.grid.shape[0])):
             for j1, x1 in enumerate(action.xrange(self.grid.shape[1])):
@@ -160,6 +163,8 @@ class Game:
         actions = []
         for y in range(self.grid.shape[0]):
             for x in range(self.grid.shape[1]):
+                if self.grid[y,x] == 0:
+                    continue
                 for a in all_actions[:]:
                     y2, x2 = y + a.dy, x + a.dx
                     if y2 < 0 or x2 < 0 or y2 >= self.grid.shape[0] or x2 >= self.grid.shape[1]:

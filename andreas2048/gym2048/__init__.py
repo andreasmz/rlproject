@@ -1,4 +1,4 @@
-from .wrapper import Env2048
+from .wrapper import *
 
 from gymnasium.envs.registration import register
 
