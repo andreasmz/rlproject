@@ -10,13 +10,16 @@ for i in range(game.grid.shape[0]):
 import time
 
 grid_r = game.grid.copy()
+history_r = game.history[-1]
 
-a = [1,2,3,4]
 
 t0 = time.perf_counter()
 
+for r in range(grid_r.shape[0]):
+    history_r[1,r] = np.sign(game.origin_table[*grid_r[r]])*r + game.origin_table[*grid_r[r]]
+    score = max(0, int(game.score_table[*grid_r[r]]))
+    grid_r[r] = game.table[*grid_r[r]]
 
-    #game.origin_table[*grid_r[r]]
 t1 = time.perf_counter()
 
 print(t1-t0)
