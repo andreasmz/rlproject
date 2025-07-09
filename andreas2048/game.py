@@ -91,6 +91,12 @@ class Game:
     @property
     def flat_stack(self) -> np.ndarray:
         return self.grid_stacks.flatten()
+    
+    @property
+    def grid_decoded(self) -> np.ndarray:
+        r = 2**self.grid.astype(np.uint32)
+        r[r == 1] = 0
+        return r
         
     def try_spawn(self) -> bool:
         if not self.alive:
@@ -224,4 +230,4 @@ class Game:
                     ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
 
     def __repr__(self) -> str:
-        return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score}; {self.move_count} moves lead to {self.highest_tile} as highest tile>"
+        return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score}; {self.move_count} moves lead to {self.highest_tile} as highest tile>\n{str(self.grid_decoded)}"
