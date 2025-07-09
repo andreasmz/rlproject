@@ -9,25 +9,23 @@ from typing import Literal, Callable
 
 
 class Action(Enum):
-    UP = (0, "y", (-1, 0))
-    DOWN = (1, "y", (1, 0))
-    LEFT = (2, "x", (0,-1))
-    RIGHT = (3, "x", (0,1))
+    UP = (0, "y", (-1, 0), 3)
+    DOWN = (1, "y", (1, 0), 1)
+    LEFT = (2, "x", (0,-1), 2)
+    RIGHT = (3, "x", (0,1), 0)
     
     axis: Literal["x", "y"]
     dy: int
     dx: int
-    xrange: Callable[[int], list[int]]
-    yrange: Callable[[int], list[int]]
+    rotations: int
 
-    def __new__(cls, value, axis, dxy):
+    def __new__(cls, value, axis, dxy, rotations):
         obj = object.__new__(cls)
         obj._value_ = value
         obj.axis = axis
         obj.dy = dxy[0]
         obj.dx = dxy[1]
-        obj.yrange = lambda s: [y for y in (range(0,s) if dxy[0] < 0 else range(s-1,-1,-1))]
-        obj.xrange = lambda s: [y for y in (range(0,s) if dxy[1] < 0 else range(s-1,-1,-1))]
+        obj.rotations = rotations
         return obj
 
 class Game:
@@ -47,7 +45,9 @@ class Game:
                        "#3c3a32", # >= 4096
                        ])
     mpl_norm = BoundaryNorm(range(0,13), ncolors=mpl_cmap.N)
-    action_space = [Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT]
+    table_cache: dict[tuple[int,int], np.ndarray] = {}
+    origin_table_cache: dict[tuple[int,int], np.ndarray] = {}
+    score_table_cache: dict[tuple[int,int], np.ndarray] = {}
 
     def __init__(self, shape:tuple[int, int] = (4,4), generator_or_seed: np.random.Generator|int|None = None, persistent_rnd: bool = False) -> None:
         self.grid = np.zeros(shape=shape, dtype=np.uint8)
@@ -55,6 +55,14 @@ class Game:
             self.rnd = np.random.default_rng(seed=generator_or_seed)
         else:
             self.rnd = generator_or_seed
+
+        if shape in Game.table_cache:
+            self.table = Game.table_cache[shape]
+            self.origin_table = Game.origin_table_cache[shape]
+            self.score_table = Game.score_table_cache[shape]
+        else:
+            self.build_table()
+
         self.persistent_rnd = persistent_rnd
         self.score = 0
         self._alive = True
@@ -62,11 +70,47 @@ class Game:
         self.score_history = [self.score]
         self._rnd_history = [self.rnd.bit_generator.state]
 
-        self.xyt_to_idx = lambda y, x, t: y*self.grid.shape[0] + x + t*self.grid.size + 2
-        self.idx_to_xyt = lambda idx: ( (int((idx-2) % self.grid.size) // self.grid.shape[0]), int((idx-2) % self.grid.shape[0]) , int((idx-2) // self.grid.size) )
+        self.try_spawn()
+        self.try_spawn()
 
-        self.try_spawn()
-        self.try_spawn()
+    def build_table(self) -> None:
+        shape = self.grid.shape
+        self.table = np.zeros(shape=[shape[0]*shape[1]+2 for x in range(shape[1])] + [shape[1]], dtype=np.uint8)
+        self.origin_table = np.zeros(shape=[shape[0]*shape[1]+2 for x in range(shape[1])] + [shape[1]], dtype=np.int8)
+        self.score_table = np.zeros(shape=[shape[0]*shape[1]+2 for x in range(shape[1])], dtype=np.int32)
+
+        for row_tuple in np.indices(self.table.shape[:-1]).reshape(len(self.table.shape)-1, -1).T:
+            score = 0
+            self.table[*row_tuple] = row_tuple
+            for i1 in range(len(row_tuple)-2,-1,-1):
+                x1 = self.table[*row_tuple,i1]
+                if x1 == 0:
+                    continue
+                i2_max = None
+                for i2 in range(i1+1,len(row_tuple)):
+                    x2 = self.table[*row_tuple,i2]
+                    if x1 == x2 and self.origin_table[*row_tuple, i2] >= 0:
+                        i2_max = None
+                        score += 2**(int(x1)+1)
+                        self.table[*row_tuple, i1] = 0
+                        self.table[*row_tuple, i2] = x2+1
+                        self.origin_table[*row_tuple, i2] = -i1-1
+                        break
+                    elif x2 == 0:
+                        i2_max = i2
+                        continue
+                    break
+                if i2_max is not None:
+                    self.table[*row_tuple, i1] = 0
+                    self.table[*row_tuple, i2_max] = x1
+                    self.origin_table[*row_tuple, i2_max] = i1+1
+            if (self.table[*row_tuple] == row_tuple).all():
+                self.score_table[*row_tuple] = -1
+            else:
+                self.score_table[*row_tuple] = score
+        Game.table_cache[shape] = self.table
+        Game.origin_table_cache[shape] = self.origin_table
+        Game.score_table_cache[shape] = self.score_table
 
     @property
     def move_count(self) -> int:
@@ -91,6 +135,12 @@ class Game:
     @property
     def flat_stack(self) -> np.ndarray:
         return self.grid_stacks.flatten()
+    
+    @property
+    def grid_decoded(self) -> np.ndarray:
+        r = 2**self.grid.astype(np.uint32)
+        r[r == 1] = 0
+        return r
         
     def try_spawn(self) -> bool:
         if not self.alive:
@@ -102,88 +152,54 @@ class Game:
         ij = empty_fields[self.rnd.integers(low=0, high=len(empty_fields))]
         x = self.rnd.choice([1,2], p=[0.8, 0.2])
         self.grid[*ij] = x
-        self.history[-1][1, *ij] = 1
+        self.history[-1][1, *ij] = 63
         if len(self.get_moves()) == 0:
             self._alive = False
             return False
         return True
-
-    def try_move(self, action: Action) -> bool:
+    
+    def try_move(self, action: Action, no_spawn: bool = False) -> bool:
         if not self.alive:
             return False
-        moves = 0
+        
+        # History
         grid_history = np.zeros(shape=(2,*self.grid.shape), dtype=self.grid.dtype)
         grid_history[0,:,:] = self.grid
         self.score_history.append(int(self.score))
         if self.persistent_rnd:
             self._rnd_history.append(self.rnd.bit_generator.state)
-        for i1, y1 in enumerate(action.yrange(self.grid.shape[0])):
-            for j1, x1 in enumerate(action.xrange(self.grid.shape[1])):
-                if self.grid[y1,x1] == 0:
-                    continue
-                if action.axis == "y":
-                    y2 = None
-                    for yy in action.yrange(self.grid.shape[0])[:i1][::-1]: # Go as far up or down as possible until hitting another block
-                        if self.grid[yy,x1] == 0:
-                            y2 = yy
-                            continue
-                        elif self.grid[yy,x1] == self.grid[y1,x1] and grid_history[1,yy,x1] < self.grid.size + 2: # Merge
-                            moves += 1
-                            grid_history[1,yy,x1] = self.xyt_to_idx(y1, x1, 1)
-                            self.grid[yy,x1] = self.grid[yy,x1]+1
-                            self.grid[y1,x1] = 0
-                            self.score += int(2**(self.grid[yy,x1]))
-                            break
-                        else:
-                            break
-                    if y2 is not None:
-                        moves += 1
-                        grid_history[1,y2,x1] = self.xyt_to_idx(y1, x1, 0)
-                        self.grid[y2,x1] = self.grid[y1,x1]
-                        self.grid[y1,x1] = 0        
 
-                else:
-                    x2 = None
-                    for xx in action.xrange(self.grid.shape[1])[:j1][::-1]: # Go as far up or down as possible until hitting another block
-                        if self.grid[y1,xx] == 0:
-                            x2 = xx
-                            continue
-                        elif self.grid[y1,xx] == self.grid[y1,x1] and grid_history[1,y1,xx] < self.grid.size + 2: # Merge
-                            moves += 1
-                            grid_history[1,y1,xx] = self.xyt_to_idx(y1, x1, 1)
-                            self.grid[y1,xx] = self.grid[y1,xx]+1
-                            self.grid[y1,x1] = 0
-                            self.score += int(2**(self.grid[y1,xx]))
-                            break
-                        else:
-                            break
-                    if x2 is not None:
-                        moves += 1
-                        grid_history[1,y1,x2] = self.xyt_to_idx(y1, x1, 0)
-                        self.grid[y1,x2] = self.grid[y1,x1]
-                        self.grid[y1,x1] = 0
-        if moves == 0:
+        grid_r = np.rot90(self.grid, k=action.rotations)
+        history_r = np.rot90(grid_history, k=action.rotations, axes=(1,2))
+
+        # Find if there is at least one valid move
+        for r in range(grid_r.shape[0]):
+            if self.score_table[*grid_r[r]] >= 0:
+                break
+        else:
             return False
+        
+        for r in range(grid_r.shape[0]):
+            history_r[1,r] = np.sign(self.origin_table[*grid_r[r]])*r + self.origin_table[*grid_r[r]]
+            self.score += max(0, int(self.score_table[*grid_r[r]]))
+            grid_r[r] = self.table[*grid_r[r]]
+
+        #grid_history[1] = np.sign(grid_history[1]) * np.tile(np.arange(0, self.grid.size, self.grid.shape[1]).reshape(-1, 1), (1, self.grid.shape[1])) + grid_history[1]
         self.history.append(grid_history)
-        return self.try_spawn()
+        if not no_spawn:
+            self.try_spawn()
+        
+        return True
     
     def get_moves(self) -> list[Action]:
-        all_actions = Game.action_space.copy()
-        actions = []
-        for y in range(self.grid.shape[0]):
-            for x in range(self.grid.shape[1]):
-                if self.grid[y,x] == 0:
-                    continue
-                for a in all_actions[:]:
-                    y2, x2 = y + a.dy, x + a.dx
-                    if y2 < 0 or x2 < 0 or y2 >= self.grid.shape[0] or x2 >= self.grid.shape[1]:
-                        continue
-                    if self.grid[y2, x2] == 0 or self.grid[y2, x2] == self.grid[y, x]:
-                        actions.append(a)
-                        all_actions.remove(a)
-                if len(all_actions) == 0:
+        possible_actions = []
+        for a in Action:
+            grid_r = np.rot90(self.grid, k=a.rotations)
+            for r in range(grid_r.shape[0]):
+                if self.score_table[*grid_r[r]] >= 0:
+                    possible_actions.append(a)
                     break
-        return actions
+        return possible_actions
     
     def undo(self) -> bool:
         if len(self.history) <= 1:
@@ -216,12 +232,11 @@ class Game:
                     fsize = 26 if self.grid[y,x] <= 6 else 20
                     plt.text(x, y, 2**self.grid[y,x], ha="center", va="center", color=c, fontsize=fsize)
 
-                if plot_arrows and self.history[-1][1,y,x] == 1:
+                if plot_arrows and self.history[-1][1,y,x] == 63:
                     ax.add_patch(Rectangle((x-0.5, y-0.5), width=1, height=1, color="red", fill=False))
-                elif plot_arrows and self.history[-1][1,y,x] >= 2:
-                    y0, x0, t = self.idx_to_xyt(self.history[-1][1,y,x])
-
-                    ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
+                elif plot_arrows and self.history[-1][1,y,x] != 0:
+                    pass
+                    #ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
 
     def __repr__(self) -> str:
-        return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score}; {self.move_count} moves lead to {self.highest_tile} as highest tile>"
+        return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score}; {self.move_count} moves lead to {self.highest_tile} as highest tile>\n{str(self.grid_decoded)}"
