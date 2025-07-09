@@ -6,6 +6,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.colors import BoundaryNorm
 from matplotlib.patches import Arrow, Rectangle
 from typing import Literal, Callable
+import time
 
 
 class Action(Enum):
@@ -161,7 +162,7 @@ class Game:
     def try_move(self, action: Action, no_spawn: bool = False) -> bool:
         if not self.alive:
             return False
-        
+
         # History
         grid_history = np.zeros(shape=(2,*self.grid.shape), dtype=self.grid.dtype)
         grid_history[0,:,:] = self.grid
@@ -183,7 +184,7 @@ class Game:
             history_r[1,r] = np.sign(self.origin_table[*grid_r[r]])*r + self.origin_table[*grid_r[r]]
             self.score += max(0, int(self.score_table[*grid_r[r]]))
             grid_r[r] = self.table[*grid_r[r]]
-
+        
         #grid_history[1] = np.sign(grid_history[1]) * np.tile(np.arange(0, self.grid.size, self.grid.shape[1]).reshape(-1, 1), (1, self.grid.shape[1])) + grid_history[1]
         self.history.append(grid_history)
         if not no_spawn:
