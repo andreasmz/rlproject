@@ -52,7 +52,7 @@ class Env2048(gym.Env):
         return self._get_obs(), self._get_info()
 
     def _get_obs(self):
-        return self.game.grid
+        return self.game.grid.copy()
     
     def _get_info(self) -> dict[str, Any]:
         return {
