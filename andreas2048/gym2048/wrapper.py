@@ -11,10 +11,8 @@ class Actions2048(gym.spaces.Space):
         super().__init__()
 
     def sample(self, mask: Any | None = None, probability: Any | None = None) -> Any:
-        if mask is not None and probability is not None:
-            raise ValueError(f"Only one of `mask` or `probability` can be provided, actual values: mask={mask}, probability={probability}")
         if mask is not None:
-            return np.random.choice(self.actions[mask])
+            return np.random.choice(self.actions[mask], p=(probability[mask] if probability is not None else None))
         return np.random.choice(self.actions, p=probability)
 
 
