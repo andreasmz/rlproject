@@ -86,7 +86,7 @@ class Game:
     
     @property
     def grid_stacks(self) -> np.ndarray:
-        return (self.grid[:, :, None] == np.arange(1, self.grid.size+1)[None, None, :]).astype(self.grid.dtype)
+        return (self.grid[None, :, :] == np.arange(1, self.grid.size+1)[:, None, None]).astype(self.grid.dtype)
     
     @property
     def flat_stack(self) -> np.ndarray:
@@ -97,6 +97,10 @@ class Game:
         r = 2**self.grid.astype(np.uint32)
         r[r == 1] = 0
         return r
+    
+    @property
+    def max_possible_value(self) -> int:
+        return self.grid.shape[0]*self.grid.shape[1] + 1
         
     def try_spawn(self) -> bool:
         if not self.alive:
