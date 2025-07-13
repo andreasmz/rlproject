@@ -7,19 +7,24 @@ from typing import Any, Sequence, SupportsFloat, Optional, Self
 class Actions2048(gym.spaces.Space):
 
     def __init__(self):
-        self.actions = np.array([Action.UP, Action.DOWN, Action.LEFT, Action.RIGHT])
+        self.actions = np.array([a for a in Action])
         super().__init__()
 
     def sample(self, mask: Any | None = None, probability: Any | None = None) -> Any:
         if mask is not None:
-            return np.random.choice(self.actions[mask], p=(probability[mask] if probability is not None else None))
+            return np.random.choice(self.actions[mask > 0], p=(probability[mask > 0]/np.sum(probability[mask > 0]) if probability is not None else None))
         return np.random.choice(self.actions, p=probability)
+    
+    @property
+    def shape(self) -> tuple:
+        return (4,)
 
 
 class Env2048(gym.Env):
     def __init__(self, shape: tuple[int, int] = (4, 4)) -> None:
         super().__init__()
         self._game = Game(shape=shape)
+        self._shape = shape
         self.action_space = Actions2048()
         self.observation_space = gym.spaces.Box(
             low=0,
@@ -46,7 +51,7 @@ class Env2048(gym.Env):
                 tuple: (observation, info)
         """
         super().reset(seed=seed)
-        self._game = Game(generator_or_seed=self.np_random)
+        self._game = Game(shape=self._shape, generator_or_seed=self.np_random)
         return self._get_obs(), self._get_info()
 
     def _get_obs(self):
