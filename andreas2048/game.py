@@ -253,12 +253,12 @@ class Game:
                     ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
         return img
     
-    def render_game(self) -> FuncAnimation:
+    def render_game(self, plot_arrows: bool = False, interval: int = 200) -> FuncAnimation:
         fig, ax = plt.subplots()
         def _draw(n):
-            img = self.plot_on_axis(ax, n=n, clear=True)
+            img = self.plot_on_axis(ax, n=n, clear=True, plot_arrows=(plot_arrows if n != -1 else False))
             return img,
-        return FuncAnimation(fig=fig, func=_draw, frames=([-1] + [n for n in range(len(self.history))]), interval=200, blit=True, repeat=False)
+        return FuncAnimation(fig=fig, func=_draw, frames=([-1] + [n for n in range(len(self.history))]), interval=interval, blit=True, repeat=False)
 
     def __repr__(self) -> str:
         return self.__call__(n=-1)
