@@ -1,9 +1,10 @@
 import numpy as np
 from enum import Enum
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 from matplotlib.axes import Axes
-from matplotlib.colors import ListedColormap
-from matplotlib.colors import BoundaryNorm
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.image import AxesImage
 from matplotlib.patches import Arrow, Rectangle
 from typing import Literal, Callable
 
@@ -221,17 +222,17 @@ class Game:
         return True
 
     
-    def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False):
+    def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False) -> AxesImage:
         if clear:
             ax.clear()
             [p.remove() for p in reversed(ax.patches)]
         grid = self.history[n]
         score = self.score_history[n]
         tile_history = self.tile_history[n]
-        ax.imshow(self.history[n], cmap=Game.mpl_cmap, norm=Game.mpl_norm)
+        img = ax.imshow(self.history[n], cmap=Game.mpl_cmap, norm=Game.mpl_norm)
         ax.set_axis_off()
         if n != -1:
-            ax.set_title(f"score {score} (step {n if n >= 0 else len(self.history) + n + 1}/{len(self.history)})")
+            ax.set_title(f"score {score} (step {n+1 if n >= 0 else len(self.history) + n + 1}/{len(self.history)})")
         elif self.alive:
             ax.set_title(f"score: {score}")
         else:
@@ -250,6 +251,14 @@ class Game:
                     y0, x0, t = self.idx_to_xyt(tile_history[y,x])
 
                     ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
+        return img
+    
+    def render_game(self) -> FuncAnimation:
+        fig, ax = plt.subplots()
+        def _draw(n):
+            img = self.plot_on_axis(ax, n=n, clear=True)
+            return img,
+        return FuncAnimation(fig=fig, func=_draw, frames=([-1] + [n for n in range(len(self.history))]), interval=200, blit=True, repeat=False)
 
     def __repr__(self) -> str:
         return self.__call__(n=-1)

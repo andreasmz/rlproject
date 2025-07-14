@@ -16,13 +16,14 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 dependencies = [
-  "numpy>=2.3",
+  "numpy>=2.2",
   "matplotlib>=3.10",
   "ipykernel",
   "ipyevents>=2.0.2",
   "ipympl>=0.9.7",
   "gynmasium",
-  "torch>=2.7"
+  "torch>=2.7",
+  "opencv-python>=4.12"
 ]
 
 
