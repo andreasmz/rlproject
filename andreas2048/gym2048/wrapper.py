@@ -12,7 +12,10 @@ class Actions2048(gym.spaces.Space):
 
     def sample(self, mask: Any | None = None, probability: Any | None = None) -> Any:
         if mask is not None:
-            return np.random.choice(self.actions[mask > 0], p=(probability[mask > 0]/np.sum(probability[mask > 0]) if probability is not None else None))
+            if probability is None:
+                return np.random.choice(self.actions[mask > 0])
+            prob_sum = np.sum(probability[mask > 0])
+            return np.random.choice(self.actions[mask > 0], p=((probability[mask > 0]/prob_sum) if prob_sum > 0 else None))
         return np.random.choice(self.actions, p=probability)
     
     @property

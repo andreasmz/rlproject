@@ -67,9 +67,13 @@ class Game:
         """ Tracks the history of the score """
         self.action_history: list[Action] = []
         self._rnd_history = [self.rnd.bit_generator.state]
+        self.heurstic_score: Callable[[np.ndarray], float]|None = None
 
         self.xyt_to_idx = lambda y, x, t: y*self.grid.shape[0] + x + t*self.grid.size + 2 # Encodes (x,y,t) as int. Offset 2, as 0 and 1 have special meaning
         self.idx_to_xyt = lambda idx: ( (int((idx-2) % self.grid.size) // self.grid.shape[0]), int((idx-2) % self.grid.shape[0]) , int((idx-2) // self.grid.size) )
+        self.idx_is_spawn = lambda idx: idx == 1
+        self.idx_is_move = lambda idx: (idx >= 2) & (idx <= (self.grid.size + 1))
+        self.idx_is_merge = lambda idx: (idx > (self.grid.size + 1)) & (idx <= (2*self.grid.size + 1))
 
         self.try_spawn()
         self.try_spawn()
@@ -132,7 +136,6 @@ class Game:
             return False
         moves = 0
         tile_history = np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
-        history_n = self.history[0].copy()
         if self.persistent_rnd:
             self._rnd_history.append(self.rnd.bit_generator.state)
         for i1, y1 in enumerate(action.yrange(self.grid.shape[0])):
@@ -145,7 +148,7 @@ class Game:
                         if self.grid[yy,x1] == 0:
                             y2 = yy
                             continue
-                        elif self.grid[yy,x1] == self.grid[y1,x1] and tile_history[yy,x1] < self.grid.size + 2: # Only allow to merge with not already merged tiles
+                        elif self.grid[yy,x1] == self.grid[y1,x1] and not self.idx_is_merge(tile_history[yy,x1]): # Merge withg not already merged tiles 
                             moves += 1
                             tile_history[yy,x1] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[yy,x1] = self.grid[yy,x1]+1
@@ -166,7 +169,7 @@ class Game:
                         if self.grid[y1,xx] == 0:
                             x2 = xx
                             continue
-                        elif self.grid[y1,xx] == self.grid[y1,x1] and tile_history[y1,xx] < self.grid.size + 2: # Merge
+                        elif self.grid[y1,xx] == self.grid[y1,x1] and not self.idx_is_merge(tile_history[y1,xx]): # Merge withg not already merged tiles 
                             moves += 1
                             tile_history[y1,xx] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[y1,xx] = self.grid[y1,xx]+1
