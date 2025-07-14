@@ -58,11 +58,16 @@ class Game:
         self.persistent_rnd = persistent_rnd
         self.score = 0
         self._alive = True
-        self.history: list[np.ndarray] = [np.stack((self.grid, np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)), axis=0)]
-        self.score_history = [self.score]
+        self.history: list[np.ndarray] = [np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)]
+        """ Tracks the history of the grid """
+        self.tile_history: list[np.ndarray] = [np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)]
+        """ Tracks the history of each tile per step: 0: Not moved, 1: spawned, 2:(n*m+2): moved origin, (n*m+2):2*(n*m+2): merged origin """
+        self.score_history: list[int] = [self.score]
+        """ Tracks the history of the score """
+        self.action_history: list[Action] = []
         self._rnd_history = [self.rnd.bit_generator.state]
 
-        self.xyt_to_idx = lambda y, x, t: y*self.grid.shape[0] + x + t*self.grid.size + 2
+        self.xyt_to_idx = lambda y, x, t: y*self.grid.shape[0] + x + t*self.grid.size + 2 # Encodes (x,y,t) as int. Offset 2, as 0 and 1 have special meaning
         self.idx_to_xyt = lambda idx: ( (int((idx-2) % self.grid.size) // self.grid.shape[0]), int((idx-2) % self.grid.shape[0]) , int((idx-2) // self.grid.size) )
 
         self.try_spawn()
@@ -76,13 +81,13 @@ class Game:
     def alive(self) -> bool:
         return self._alive
     
-    @property
-    def highest_tile(self) -> int:
-        return 2**int(np.max(self.grid))
+    def highest_tile(self, n: int = -1):
+        return 2**int(np.max(self.history[n]))
     
-    @property
-    def reward(self) -> int:
-        return self.score - self.score_history[-1]
+    def reward(self, n: int = -1) -> int:
+        if n <= 0:
+            n = len(self.history) + n
+        return self.score_history[n] - self.score_history[max(0,n-1)]
     
     @property
     def grid_stacks(self) -> np.ndarray:
@@ -92,9 +97,11 @@ class Game:
     def flat_stack(self) -> np.ndarray:
         return self.grid_stacks.flatten()
     
-    @property
-    def grid_decoded(self) -> np.ndarray:
-        r = 2**self.grid.astype(np.uint32)
+    def grid_decoded(self, n: int = -1) -> np.ndarray:
+        if n == -1:
+            r = 2**self.grid.astype(np.uint32)
+        else:
+            r = 2**self.history[n].astype(np.uint32)
         r[r == 1] = 0
         return r
     
@@ -112,7 +119,8 @@ class Game:
         ij = empty_fields[self.rnd.integers(low=0, high=len(empty_fields))]
         x = self.rnd.choice([1,2], p=[0.8, 0.2])
         self.grid[*ij] = x
-        self.history[-1][1, *ij] = 1
+        self.history[-1][*ij] = x
+        self.tile_history[-1][*ij] = 1
         if len(self.get_moves()) == 0:
             self._alive = False
             return False
@@ -122,9 +130,8 @@ class Game:
         if not self.alive:
             return False
         moves = 0
-        grid_history = np.zeros(shape=(2,*self.grid.shape), dtype=self.grid.dtype)
-        grid_history[0,:,:] = self.grid
-        self.score_history.append(int(self.score))
+        tile_history = np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
+        history_n = self.history[0].copy()
         if self.persistent_rnd:
             self._rnd_history.append(self.rnd.bit_generator.state)
         for i1, y1 in enumerate(action.yrange(self.grid.shape[0])):
@@ -137,9 +144,9 @@ class Game:
                         if self.grid[yy,x1] == 0:
                             y2 = yy
                             continue
-                        elif self.grid[yy,x1] == self.grid[y1,x1] and grid_history[1,yy,x1] < self.grid.size + 2: # Merge
+                        elif self.grid[yy,x1] == self.grid[y1,x1] and tile_history[yy,x1] < self.grid.size + 2: # Only allow to merge with not already merged tiles
                             moves += 1
-                            grid_history[1,yy,x1] = self.xyt_to_idx(y1, x1, 1)
+                            tile_history[yy,x1] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[yy,x1] = self.grid[yy,x1]+1
                             self.grid[y1,x1] = 0
                             self.score += int(2**(self.grid[yy,x1]))
@@ -148,7 +155,7 @@ class Game:
                             break
                     if y2 is not None:
                         moves += 1
-                        grid_history[1,y2,x1] = self.xyt_to_idx(y1, x1, 0)
+                        tile_history[y2,x1] = self.xyt_to_idx(y1, x1, 0)
                         self.grid[y2,x1] = self.grid[y1,x1]
                         self.grid[y1,x1] = 0        
 
@@ -158,9 +165,9 @@ class Game:
                         if self.grid[y1,xx] == 0:
                             x2 = xx
                             continue
-                        elif self.grid[y1,xx] == self.grid[y1,x1] and grid_history[1,y1,xx] < self.grid.size + 2: # Merge
+                        elif self.grid[y1,xx] == self.grid[y1,x1] and tile_history[y1,xx] < self.grid.size + 2: # Merge
                             moves += 1
-                            grid_history[1,y1,xx] = self.xyt_to_idx(y1, x1, 1)
+                            tile_history[y1,xx] = self.xyt_to_idx(y1, x1, 1)
                             self.grid[y1,xx] = self.grid[y1,xx]+1
                             self.grid[y1,x1] = 0
                             self.score += int(2**(self.grid[y1,xx]))
@@ -169,12 +176,15 @@ class Game:
                             break
                     if x2 is not None:
                         moves += 1
-                        grid_history[1,y1,x2] = self.xyt_to_idx(y1, x1, 0)
+                        tile_history[y1,x2] = self.xyt_to_idx(y1, x1, 0)
                         self.grid[y1,x2] = self.grid[y1,x1]
                         self.grid[y1,x1] = 0
         if moves == 0:
             return False
-        self.history.append(grid_history)
+        self.history.append(self.grid.copy())
+        self.tile_history.append(tile_history)
+        self.score_history.append(self.score)
+        self.action_history.append(action)
         return self.try_spawn()
     
     def get_moves(self) -> list[Action]:
@@ -201,37 +211,51 @@ class Game:
         if not self.alive:
             self._alive = True
         
-        self.score = self.score_history.pop()
-        self.grid = self.history.pop()[0]
+        self.history.pop()
+        self.tile_history.pop()
+        self.score_history.pop()
+        self.grid = self.history[-1].copy()
+        self.score = self.score_history[-1]
         if len(self._rnd_history) > 1:
             self.rnd.bit_generator.state = self._rnd_history.pop()
         return True
 
     
-    def plot_on_axis(self, ax: Axes, clear: bool = True, plot_arrows: bool = False):
+    def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False):
         if clear:
             ax.clear()
             [p.remove() for p in reversed(ax.patches)]
-        ax.imshow(self.grid, cmap=Game.mpl_cmap, norm=Game.mpl_norm)
+        grid = self.history[n]
+        score = self.score_history[n]
+        tile_history = self.tile_history[n]
+        ax.imshow(self.history[n], cmap=Game.mpl_cmap, norm=Game.mpl_norm)
         ax.set_axis_off()
-        if self.alive:
-            ax.set_title(f"score: {self.score}")
+        if n != -1:
+            ax.set_title(f"score {score} (step {n if n >= 0 else len(self.history) + n + 1}/{len(self.history)})")
+        elif self.alive:
+            ax.set_title(f"score: {score}")
         else:
-            ax.set_title(f"Game over (score: {self.score})")
+            ax.set_title(f"Game over (score: {score})")
 
         for y in range(self.grid.shape[0]):
             for x in range(self.grid.shape[1]):
-                if self.grid[y,x] != 0:
-                    c = "white" if self.grid[y,x] >= 3 else "black"
-                    fsize = 26 if self.grid[y,x] <= 6 else 20
-                    plt.text(x, y, 2**self.grid[y,x], ha="center", va="center", color=c, fontsize=fsize)
+                if grid[y,x] != 0:
+                    c = "white" if grid[y,x] >= 3 else "black"
+                    fsize = 26 if grid[y,x] <= 6 else 20
+                    plt.text(x, y, 2**grid[y,x], ha="center", va="center", color=c, fontsize=fsize)
 
-                if plot_arrows and self.history[-1][1,y,x] == 1:
+                if plot_arrows and tile_history[y,x] == 1:
                     ax.add_patch(Rectangle((x-0.5, y-0.5), width=1, height=1, color="red", fill=False))
-                elif plot_arrows and self.history[-1][1,y,x] >= 2:
-                    y0, x0, t = self.idx_to_xyt(self.history[-1][1,y,x])
+                elif plot_arrows and tile_history[y,x] >= 2:
+                    y0, x0, t = self.idx_to_xyt(tile_history[y,x])
 
                     ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="red" if t == 1 else "blue", width=0.5, alpha=0.3))
 
     def __repr__(self) -> str:
-        return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score}; {self.move_count} moves lead to {self.highest_tile} as highest tile>\n{str(self.grid_decoded)}"
+        return self.__call__(n=-1)
+
+    def __call__(self, n: int = -1) -> str:
+        if n == -1:
+            return f"<2048 Game{' (Ended)' if not self.alive else ''}: score {self.score} and {self.move_count} moves lead to {self.highest_tile()} as highest tile>\n{str(self.grid_decoded())}"
+        else:
+            return f"<2048 Game{f' (step {n+1 if n >= 0 else len(self.history) + n + 1}/{len(self.history)})'}: score {self.score_history[n]} and {self.highest_tile(n)} as highest tile>\n{str(self.grid_decoded(n))}"
