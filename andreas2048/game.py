@@ -122,7 +122,7 @@ class Game:
             self._alive = False
             return False
         ij = empty_fields[self.rnd.integers(low=0, high=len(empty_fields))]
-        x = self.rnd.choice([1,2], p=[0.8, 0.2])
+        x = self.rnd.choice([1,2], p=[0.9, 0.1])
         self.grid[*ij] = x
         self.history[-1][*ij] = x
         self.tile_history[-1][*ij] = 1
