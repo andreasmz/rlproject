@@ -147,9 +147,28 @@ class State:
     def next(self, action: Action) -> "State":
         """ Returns the next state. If the move is invalid, returns self"""
         s = self.apply_move(action=action)
-        if s != self:
+        if s.n != self.n:
             s.apply_spawn()
         return s
+    
+    def get_next_states(self, action: Action) -> "dict[State, float]":
+        """ Returns all next states with their probability """
+        s = self.apply_move(action=action)
+        if s == self:
+            return {self: 1.0}
+        empty_fields = np.argwhere(s.grid == 0)
+        if len(empty_fields) == 0:
+            return {self: 1.0}
+        r: dict[State, float] = {}
+        for ij in empty_fields:
+            for v,p in [(1, 0.9), (2, 0.1)]:
+                sn = s.clone()
+                sn.grid[*ij] = v
+                sn.tile_history[*ij] = State.TILE_SPAWNED_CONST
+                if len(sn.get_moves()) == 0:
+                    sn.alive = False
+                r[sn] = p/len(empty_fields)
+        return r
     
     @staticmethod
     def build_table(shape: tuple[int, int]) -> None:
@@ -191,10 +210,13 @@ class State:
         State.origin_table_cache[shape] = origin_table
         State.score_table_cache[shape] = score_table
 
-    def __eq__(self, value: object) -> bool:
-        if not isinstance(value, State):
-            raise TypeError(f"Can't compare a state to {type(value)}")
-        return self.n == value.n
+    # def __eq__(self, value: object) -> bool:
+    #     if not isinstance(value, State):
+    #         raise TypeError(f"Can't compare a state to {type(value)}")
+    #     return self.n == value.n
+
+    def clone(self) -> "State":
+        return State(n=self.n, score=self.score, grid=self.grid.copy(), rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
     
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
@@ -263,7 +285,7 @@ class Game:
     
     def next(self, action: Action) -> State:
         s = self.state.next(action=action)
-        if s != self.state:
+        if s.n != self.state.n:
             self.history.append(s)
         return s
     
@@ -278,8 +300,6 @@ class Game:
             n = len(self.history) + n
         return self.history[n].score - self.history[max(0,n-1)].score
     
-    
-
     def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False) -> AxesImage:
         if clear:
             ax.clear()
