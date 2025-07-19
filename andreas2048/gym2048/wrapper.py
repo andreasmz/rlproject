@@ -45,7 +45,7 @@ class Env2048(gym.Env):
             Returns:
                 tuple: (observation, reward, terminated, truncated, info)
         """
-        self.game.try_move(action)
+        self.game.next(action)
         return self._get_obs(), self.game.reward(), not self.game.alive, False, self._get_info()
     
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> tuple[Any, dict[str, Any]]:
@@ -64,7 +64,7 @@ class Env2048(gym.Env):
         return {
             "alive": self.game.alive,
             "score": self.game.score,
-            "highest_tile": self.game.highest_tile(),
+            "highest_tile": self.game.highest_tile,
             "move_count": self.game.move_count,
         }
     
