@@ -6,7 +6,7 @@ from matplotlib.axes import Axes
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.image import AxesImage
 from matplotlib.patches import Arrow, Rectangle
-from typing import Literal, Any, Self
+from typing import Literal, Any, Self, Callable
 import time
 
 
@@ -248,7 +248,6 @@ class Game:
         self.persistent_rnd = persistent_rnd 
 
         self.shape = shape
-        self._alive = True
         s0 = State(n=0, grid=np.zeros(shape=shape, dtype=np.uint8), tile_history=np.zeros(shape=shape, dtype=np.uint8), score=0, rnd=self.rnd).apply_spawn().apply_spawn()
         self.history: list[State] = [s0]
 
@@ -300,28 +299,33 @@ class Game:
             n = len(self.history) + n
         return self.history[n].score - self.history[max(0,n-1)].score
     
-    def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False) -> AxesImage:
+    def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False, value_str: str|None = None) -> AxesImage:
         if clear:
             ax.clear()
             [p.remove() for p in reversed(ax.patches)]
         grid = self.history[n].grid
+        grid_decoded = self.history[n].grid_decoded
         score = self.history[n].score
         tile_history = self.history[n].tile_history
         img = ax.imshow(grid, cmap=Game.mpl_cmap, norm=Game.mpl_norm)
         ax.set_axis_off()
+        s = ""
         if n != -1:
-            ax.set_title(f"score {score} (step {n+1 if n >= 0 else len(self.history) + n + 1}/{len(self.history)})")
+            s = (f"score {score} (step {n+1 if n >= 0 else len(self.history) + n + 1}/{len(self.history)})")
         elif self.history[n].alive:
-            ax.set_title(f"score: {score}")
+            s = (f"score: {score}")
         else:
-            ax.set_title(f"Game over (score: {score})")
+            s = (f"Game over (score: {score})")
+        if value_str is not None:
+            s += f"\n{value_str}"
+        ax.set_title(s)
 
         for y in range(grid.shape[0]):
             for x in range(grid.shape[1]):
                 if grid[y,x] != 0:
                     c = "white" if grid[y,x] >= 3 else "black"
                     fsize = 26 if grid[y,x] <= 6 else 20
-                    plt.text(x, y, 2**grid[y,x], ha="center", va="center", color=c, fontsize=fsize)
+                    plt.text(x, y, grid_decoded[y,x], ha="center", va="center", color=c, fontsize=fsize)
 
                 if plot_arrows:
                     th = tile_history[y,x]
@@ -335,10 +339,11 @@ class Game:
                         ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="blue", width=0.5, alpha=0.3))
         return img
     
-    def render_game(self, plot_arrows: bool = False, interval: int = 200) -> FuncAnimation:
+    def render_game(self, plot_arrows: bool = False, interval: int = 200, value_func: Callable|None = None) -> FuncAnimation:
         fig, ax = plt.subplots()
         def _draw(n):
-            img = self.plot_on_axis(ax, n=n, clear=True, plot_arrows=(plot_arrows if n != -1 else False))
+            value_str = value_func(self.history[n].grid) if value_func is not None else None
+            img = self.plot_on_axis(ax, n=n, clear=True, plot_arrows=(plot_arrows if n != -1 else False), value_str=value_str)
             return img,
         return FuncAnimation(fig=fig, func=_draw, frames=([-1] + [n for n in range(len(self.history))]), interval=interval, blit=True, repeat=False)
 
