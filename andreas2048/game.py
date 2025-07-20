@@ -215,8 +215,11 @@ class State:
     #         raise TypeError(f"Can't compare a state to {type(value)}")
     #     return self.n == value.n
 
-    def clone(self) -> "State":
-        return State(n=self.n, score=self.score, grid=self.grid.copy(), rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
+    def clone(self, rot: int|None = None) -> "State":
+        grid = self.grid.copy()
+        if rot is not None:
+            grid = np.rot90(grid, k=rot)
+        return State(n=self.n, score=self.score, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
     
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
