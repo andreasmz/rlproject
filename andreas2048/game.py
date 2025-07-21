@@ -44,7 +44,7 @@ class State:
     def __init__(self, 
                  n: int, 
                  score: int, 
-                 reward: int,
+                 reward: float,
                  grid: np.ndarray, 
                  rnd: np.random.Generator,
                  alive: bool = True, 
@@ -175,6 +175,12 @@ class State:
                 r[sn] = p/len(empty_fields)
         return r
     
+    def backtrace_reward(self, discounted_reward: float, lambda_: float):
+        self.reward += discounted_reward
+        if self.parent is not None:
+            self.parent.backtrace_reward(discounted_reward=(discounted_reward*lambda_), lambda_=lambda_)
+
+    
     @staticmethod
     def build_table(shape: tuple[int, int]) -> None:
         """ Build the tables for a given shape """
@@ -302,7 +308,7 @@ class Game:
         self.history.pop()
         return True
     
-    def reward(self, n: int = -1) -> int:
+    def reward(self, n: int = -1) -> int|float:
         if n <= 0:
             n = len(self.history) + n
         return self.history[n].reward
