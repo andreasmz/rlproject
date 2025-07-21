@@ -302,7 +302,7 @@ class Game:
     def reward(self, n: int = -1) -> int:
         if n <= 0:
             n = len(self.history) + n
-        return self.history[n].score - self.history[max(0,n-1)].score
+        return self.history[n].reward
     
     def plot_on_axis(self, ax: Axes, n: int = -1, clear: bool = True, plot_arrows: bool = False, value_str: str|None = None) -> AxesImage:
         if clear:
