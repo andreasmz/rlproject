@@ -49,7 +49,9 @@ class State:
                  rnd: np.random.Generator,
                  alive: bool = True, 
                  tile_history: np.ndarray|None = None, 
-                 action: Action|None = None) -> None:
+                 action: Action|None = None,
+                 parent_state: Self|None = None
+                 ) -> None:
         self.n = n
         self.grid = grid
         self.tile_history = tile_history if tile_history is not None else np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
@@ -58,6 +60,7 @@ class State:
         self.alive = alive
         self.action = action
         self.rnd = rnd
+        self.parent = parent_state
 
         shape = self.grid.shape
         if shape not in State.table_cache:
@@ -128,7 +131,7 @@ class State:
             score += max(0, int(self._score_table[*grid_r[r]])) # While some row moves do not change the grid, the overall Action may nevertheless be valid --> max(0,score)
             grid_r[r] = self._table[*grid_r[r]] # Update grid
         
-        return State(n=(self.n+1), score=score, reward=score-self.score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd)
+        return State(n=(self.n+1), score=score, reward=score-self.score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd, parent_state=self)
     
     def apply_spawn(self) -> "State":
         """ Tries to spawn a new tile in this state. Set alive to False and returns False if no tile can be spawned or the move count is zero after spawning"""
