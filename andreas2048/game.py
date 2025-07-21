@@ -344,10 +344,11 @@ class Game:
                         ax.add_patch(Arrow(x0, y0, (x-x0), (y-y0), color="blue", width=0.5, alpha=0.3))
         return img
     
-    def render_game(self, plot_arrows: bool = False, interval: int = 200, value_func: Callable|None = None) -> FuncAnimation:
+    def render_game(self, plot_arrows: bool = False, interval: int = 200, value_func: Callable|None = None, state_func: Callable|None = None) -> FuncAnimation:
         fig, ax = plt.subplots()
         def _draw(n):
             value_str = value_func(self.history[n].grid) if value_func is not None else None
+            value_str = state_func(self.history[n]) if state_func is not None else None
             img = self.plot_on_axis(ax, n=n, clear=True, plot_arrows=(plot_arrows if n != -1 else False), value_str=value_str)
             return img,
         return FuncAnimation(fig=fig, func=_draw, frames=([-1] + [n for n in range(len(self.history))]), interval=interval, blit=True, repeat=False)
