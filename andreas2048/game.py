@@ -44,6 +44,7 @@ class State:
     def __init__(self, 
                  n: int, 
                  score: int, 
+                 reward: int,
                  grid: np.ndarray, 
                  rnd: np.random.Generator,
                  alive: bool = True, 
@@ -53,6 +54,7 @@ class State:
         self.grid = grid
         self.tile_history = tile_history if tile_history is not None else np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
         self.score = score
+        self.reward = reward
         self.alive = alive
         self.action = action
         self.rnd = rnd
@@ -126,7 +128,7 @@ class State:
             score += max(0, int(self._score_table[*grid_r[r]])) # While some row moves do not change the grid, the overall Action may nevertheless be valid --> max(0,score)
             grid_r[r] = self._table[*grid_r[r]] # Update grid
         
-        return State(n=(self.n+1), score=score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd)
+        return State(n=(self.n+1), score=score, reward=score-self.score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd)
     
     def apply_spawn(self) -> "State":
         """ Tries to spawn a new tile in this state. Set alive to False and returns False if no tile can be spawned or the move count is zero after spawning"""
@@ -219,7 +221,7 @@ class State:
         grid = self.grid.copy()
         if rot is not None:
             grid = np.rot90(grid, k=rot)
-        return State(n=self.n, score=self.score, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
+        return State(n=self.n, score=self.score, reward=self.reward, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
     
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
@@ -251,7 +253,7 @@ class Game:
         self.persistent_rnd = persistent_rnd 
 
         self.shape = shape
-        s0 = State(n=0, grid=np.zeros(shape=shape, dtype=np.uint8), tile_history=np.zeros(shape=shape, dtype=np.uint8), score=0, rnd=self.rnd).apply_spawn().apply_spawn()
+        s0 = State(n=0, grid=np.zeros(shape=shape, dtype=np.uint8), tile_history=np.zeros(shape=shape, dtype=np.uint8), score=0, reward=0, rnd=self.rnd).apply_spawn().apply_spawn()
         self.history: list[State] = [s0]
 
     @property
