@@ -63,6 +63,7 @@ class State:
         self.rnd = rnd
         self.parent = parent_state
         self.probs = probs
+        self.warm_start_score: int = 0
 
         shape = self.grid.shape
         if shape not in State.table_cache:
@@ -79,6 +80,7 @@ class State:
         for i in range(n):
             self.apply_spawn(probs=(tiles, np.array(p)/np.sum(p)))
         self.score = self.estimate_score()
+        self.warm_start_score = self.score
         return self
 
     def estimate_score(self) -> int:
