@@ -50,7 +50,8 @@ class State:
                  alive: bool = True, 
                  tile_history: np.ndarray|None = None, 
                  action: Action|None = None,
-                 parent_state: Self|None = None
+                 parent_state: Self|None = None,
+                 probs: tuple[list[int], list[float]] = ([1,2], [0.9, 0.1])
                  ) -> None:
         self.n = n
         self.grid = grid
@@ -61,6 +62,7 @@ class State:
         self.action = action
         self.rnd = rnd
         self.parent = parent_state
+        self.probs = probs
 
         shape = self.grid.shape
         if shape not in State.table_cache:
@@ -68,6 +70,20 @@ class State:
         self._table = State.table_cache[shape]
         self._origin_table = State.origin_table_cache[shape]
         self._score_table = State.score_table_cache[shape]
+
+    def warm_start(self, tiles: list[int], p: list[float], n:int = 2) -> "State":
+        if len(tiles) != len(p):
+            raise ValueError(f"The list of tiles and p must have the same number of elements. You provied {len(tiles)} tiles and {len(p)} p")
+        self.grid = np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
+        self.tile_history = np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
+        for i in range(n):
+            self.apply_spawn(probs=(tiles, np.array(p)/np.sum(p)))
+        self.score = self.estimate_score()
+        return self
+
+    def estimate_score(self) -> int:
+        x = self.grid.astype(np.int32)
+        return int(round(np.sum(np.clip(2**x*(x-1.1), a_min=0, a_max=None))))
 
     @property
     def highest_tile(self) -> int:
@@ -131,9 +147,9 @@ class State:
             score += max(0, int(self._score_table[*grid_r[r]])) # While some row moves do not change the grid, the overall Action may nevertheless be valid --> max(0,score)
             grid_r[r] = self._table[*grid_r[r]] # Update grid
         
-        return State(n=(self.n+1), score=score, reward=score-self.score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd, parent_state=self)
+        return State(n=(self.n+1), score=score, reward=score-self.score, grid=grid, tile_history=tile_history, action=action, rnd=self.rnd, parent_state=self, probs=self.probs)
     
-    def apply_spawn(self) -> "State":
+    def apply_spawn(self, probs:tuple[list[int], list[float]]|None = None) -> "State":
         """ Tries to spawn a new tile in this state. Set alive to False and returns False if no tile can be spawned or the move count is zero after spawning"""
         if not self.alive:
             return self
@@ -142,7 +158,7 @@ class State:
             self.alive = False
             return self
         ij = empty_fields[self.rnd.integers(low=0, high=len(empty_fields))]
-        x = self.rnd.choice([1,2], p=[0.9, 0.1])
+        x = self.rnd.choice(probs[0] if probs is not None else self.probs[0], p=(probs[1] if probs is not None else self.probs[1]))
         self.grid[*ij] = x
         self.tile_history[*ij] = State.TILE_SPAWNED_CONST
         if len(self.get_moves()) == 0:
@@ -166,7 +182,7 @@ class State:
             return {self: 1.0}
         r: dict[State, float] = {}
         for ij in empty_fields:
-            for v,p in [(1, 0.9), (2, 0.1)]:
+            for v,p in zip(*self.probs):
                 sn = s.clone()
                 sn.grid[*ij] = v
                 sn.tile_history[*ij] = State.TILE_SPAWNED_CONST
@@ -230,7 +246,7 @@ class State:
         grid = self.grid.copy()
         if rot is not None:
             grid = np.rot90(grid, k=rot)
-        return State(n=self.n, score=self.score, reward=self.reward, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=self.tile_history.copy(), action=self.action)
+        return State(n=self.n, score=self.score, reward=self.reward, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=None, action=self.action, parent_state=self.parent, probs=self.probs)
     
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
