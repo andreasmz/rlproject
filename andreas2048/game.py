@@ -209,19 +209,17 @@ class State:
                     if self.grid[i,j] == (self.grid[i+1,j]):
                         bonus_grid[i,j] = 2**self.grid[i,j]
                     elif self.grid[i,j] == (self.grid[i+1,j] + 1) and self.grid[i+1,j] >= 3:
-                        bonus_grid[i,j] = 2**self.grid[i,j]
+                        bonus_grid[i,j] = 2**self.grid[i,j]*0.75
                     elif (self.grid[i,j] + 1) == self.grid[i+1,j]:
-                        bonus_grid[i+1,j] = 2**self.grid[i+1,j]
+                        bonus_grid[i+1,j] = 2**self.grid[i+1,j]*0.75
                 if j < (self.grid.shape[1] - 1):
                     if self.grid[i,j] == (self.grid[i,j+1]):
                         bonus_grid[i,j] = 2**self.grid[i,j]
                     elif self.grid[i,j] == (self.grid[i,j+1] + 1) and self.grid[i,j+1] >= 3:
-                        bonus_grid[i,j] = 2**self.grid[i,j]
+                        bonus_grid[i,j] = 2**self.grid[i,j]*0.75
                     elif (self.grid[i,j] + 1) == self.grid[i,j+1]:
-                        bonus_grid[i,j+1] = 2**self.grid[i,j+1]
+                        bonus_grid[i,j+1] = 2**self.grid[i,j+1]*0.75
         return np.sum(bonus_grid)
-
-
     
     @staticmethod
     def build_table(shape: tuple[int, int]) -> None:
@@ -274,6 +272,11 @@ class State:
             grid = np.rot90(grid, k=rot)
         return State(n=self.n, score=self.score, reward=self.reward, grid=grid, rnd=self.rnd, alive=self.alive, tile_history=None, action=self.action, parent_state=self.parent, probs=self.probs)
     
+    @property
+    def tile_distribution(self) -> dict[int, int]:
+        values, counts = np.unique(self.grid[self.grid != 0], return_counts=True)
+        return dict(zip(values.tolist(), counts.tolist()))
+
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
     
