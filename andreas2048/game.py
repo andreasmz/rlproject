@@ -198,6 +198,30 @@ class State:
         if self.parent is not None:
             self.parent.backtrace_reward(discounted_reward=(discounted_reward*lambda_), lambda_=lambda_)
 
+    @property
+    def score_bonus(self) -> float:
+        bonus_grid = np.zeros(shape=self.grid.shape, dtype=np.int32)
+        for i in range(self.grid.shape[0]):
+            for j in range(self.grid.shape[1]):
+                if self.grid[i,j] < 3:
+                    continue
+                if i < (self.grid.shape[0] - 1):
+                    if self.grid[i,j] == (self.grid[i+1,j]):
+                        bonus_grid[i,j] = 2**self.grid[i,j]
+                    elif self.grid[i,j] == (self.grid[i+1,j] + 1) and self.grid[i+1,j] >= 3:
+                        bonus_grid[i,j] = 2**self.grid[i,j]
+                    elif (self.grid[i,j] + 1) == self.grid[i+1,j]:
+                        bonus_grid[i+1,j] = 2**self.grid[i+1,j]
+                if j < (self.grid.shape[1] - 1):
+                    if self.grid[i,j] == (self.grid[i,j+1]):
+                        bonus_grid[i,j] = 2**self.grid[i,j]
+                    elif self.grid[i,j] == (self.grid[i,j+1] + 1) and self.grid[i,j+1] >= 3:
+                        bonus_grid[i,j] = 2**self.grid[i,j]
+                    elif (self.grid[i,j] + 1) == self.grid[i,j+1]:
+                        bonus_grid[i,j+1] = 2**self.grid[i,j+1]
+        return np.sum(bonus_grid)
+
+
     
     @staticmethod
     def build_table(shape: tuple[int, int]) -> None:
