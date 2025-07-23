@@ -252,6 +252,17 @@ class State:
     
     def __repr__(self) -> str:
         return f"<2048 Game State n={self.n}: score: {self.score} - highest tile {self.highest_tile} >\n{str(self.grid_decoded)}"
+    
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        dels = ["rnd", "_table", "_origin_table", "_score_table"]
+        for d in dels:
+            if d in state:
+                del state[d]
+        return state
+    
+    def __setstate__(self, state):
+        self.__dict__.update(state)
 
 class Game:
     """ Implements the 2048 game """
@@ -384,3 +395,13 @@ class Game:
 
         return f"<2048 Game{' (Ended)' if not self.alive else ''}: score: {self.score} - moves: {self.move_count} - highest tile: {self.highest_tile}>\n{str(self.grid_decoded)}"
 
+    def __getstate__(self) -> object:
+        state = self.__dict__.copy()
+        dels = ["rnd"]
+        for d in dels:
+            if d in state:
+                del state[d]
+        return state
+    
+    def __setstate__(self, state):
+        self.__dict__.update(state)
