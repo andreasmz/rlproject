@@ -193,10 +193,13 @@ class State:
                 r[sn] = p/len(empty_fields)
         return r
     
-    def backtrace_reward(self, discounted_reward: float, lambda_: float):
-        self.reward += discounted_reward
+    def backtrace_reward(self, discounted_reward: float, lambda_: float, adjust: bool):
+        if adjust:
+            self.reward += (1-lambda_)*discounted_reward
+        else:
+            self.reward += (1-lambda_)*discounted_reward
         if self.parent is not None:
-            self.parent.backtrace_reward(discounted_reward=(discounted_reward*lambda_), lambda_=lambda_)
+            self.parent.backtrace_reward(discounted_reward=(discounted_reward*lambda_), lambda_=lambda_, adjust=adjust)
 
     @property
     def score_bonus(self) -> float:
