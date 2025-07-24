@@ -197,7 +197,7 @@ class State:
         if adjust:
             self.reward += (1-lambda_)*discounted_reward
         else:
-            self.reward += (1-lambda_)*discounted_reward
+            self.reward += discounted_reward
         if self.parent is not None:
             self.parent.backtrace_reward(discounted_reward=(discounted_reward*lambda_), lambda_=lambda_, adjust=adjust)
 
