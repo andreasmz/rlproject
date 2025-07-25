@@ -1,5 +1,5 @@
 [project]
-name = "Andreas2048"
+name = "andreas2048"
 dynamic = ["version"]
 authors = [
   { name="Andreas Brilka" },
@@ -23,7 +23,8 @@ dependencies = [
   "ipympl>=0.9.7",
   "gynmasium",
   "torch>=2.7",
-  "opencv-python>=4.12"
+  "opencv-python>=4.12",
+  "pandas"
 ]
 
 

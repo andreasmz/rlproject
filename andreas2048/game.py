@@ -73,6 +73,13 @@ class State:
         self._score_table = State.score_table_cache[shape]
 
     def warm_start(self, tiles: list[int], p: list[float], n:int = 2) -> "State":
+        """ Resets the grid state and apply warm start = spawning of higher tiles with probability p
+        
+        Args:
+            tiles (list[int]): The tiles (log2) to spawn
+            p (list[float]): The proabilities of the tiles. Does not need to be normed
+            n (int): The number of tiles to spawn
+        """
         if len(tiles) != len(p):
             raise ValueError(f"The list of tiles and p must have the same number of elements. You provied {len(tiles)} tiles and {len(p)} p")
         self.grid = np.zeros(shape=self.grid.shape, dtype=self.grid.dtype)
@@ -84,6 +91,7 @@ class State:
         return self
 
     def estimate_score(self) -> int:
+        """ Estimate the score of the current board """
         x = self.grid.astype(np.int32)
         return int(round(np.sum(np.clip(2**x*(x-1.1), a_min=0, a_max=None))))
 
@@ -99,6 +107,7 @@ class State:
     
     @property
     def flat_stack(self) -> np.ndarray:
+        """ Return a flattened version of the grid """
         return self.grid_stacks.flatten()
     
     @property
@@ -109,6 +118,7 @@ class State:
         return r
     
     def get_moves(self) -> list[Action]:
+        """ Return all possible moves """
         possible_actions = []
         for a in Action:
             grid_r = np.rot90(self.grid, k=a.rotations)
@@ -194,6 +204,7 @@ class State:
         return r
     
     def backtrace_reward(self, discounted_reward: float, lambda_: float, adjust: bool):
+        """ Backtrace a reward and decay it by lambda. If adjust, regular TD(lambda) is performed """
         if adjust:
             self.reward += (1-lambda_)*discounted_reward
         else:
@@ -203,6 +214,9 @@ class State:
 
     @property
     def score_bonus(self) -> float:
+        """ Implements a heuristic to add a bonus to the current score for adjacent tiles just one step away from each other (e.g. 256 and 512)
+        The bonus is designed to be lower than when the merging would have been performed
+        """
         bonus_grid = np.zeros(shape=self.grid.shape, dtype=np.int32)
         for i in range(self.grid.shape[0]):
             for j in range(self.grid.shape[1]):
@@ -277,6 +291,7 @@ class State:
     
     @property
     def tile_distribution(self) -> dict[int, int]:
+        """ Returns the tile distribution for the game """
         values, counts = np.unique(self.grid[self.grid != 0], return_counts=True)
         return dict(zip(values.tolist(), counts.tolist()))
 
