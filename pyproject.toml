@@ -1,6 +1,6 @@
 [project]
 name = "andreas2048"
-version = "1.0.0"
+version = "1.0.1"
 authors = [
   { name="Andreas Brilka" },
 ]
@@ -21,7 +21,7 @@ dependencies = [
   "ipykernel",
   "ipyevents>=2.0.2",
   "ipympl>=0.9.7",
-  "gynmasium",
+  "gymnasium>=1.2.0",
   "torch>=2.7",
   "opencv-python>=4.12",
   "pandas"
