@@ -1,6 +1,6 @@
 [project]
 name = "andreas2048"
-dynamic = ["version"]
+version = "1.0.0"
 authors = [
   { name="Andreas Brilka" },
 ]
@@ -39,3 +39,13 @@ Documentation = "https://andreasmz.github.io/rlproject/"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build]
+exclude = [
+  "/dev",
+  "/rl",
+  "/dist",
+  "/results",
+  "/media",
+  "/models"
+]

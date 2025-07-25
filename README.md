@@ -32,5 +32,5 @@ The module is designed to also contain the dependencies for the notebooks. To in
 
 ```bash
 conda create -n andreas2024 python=3.13
-pip install 
+pip install "https://github.com/andreasmz/rlproject/releases/download/v1.0.0/andreas2048-1.0.0-py3-none-any.whl" --upgrade
 ```
